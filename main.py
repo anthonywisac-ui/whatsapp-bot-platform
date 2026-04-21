@@ -79,6 +79,13 @@ def create_admin():
     else:
         return {"msg": "Admin already exists"}
 
+
+@app.get("/debug-users")
+def debug_users():
+    from db import _users_db
+    # Return only usernames (no passwords)
+    return {"users": list(_users_db.keys())}
+
 # ========== CMS ROUTES (if exists) ==========
 try:
     from cms.routes import router as cms_router
