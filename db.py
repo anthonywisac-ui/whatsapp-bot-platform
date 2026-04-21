@@ -56,3 +56,61 @@ def get_favorite_items(sender):
 async def save_to_sheet(customer_number, session, order_id):
     # Placeholder - implement Google Sheets if needed
     print(f"Order #{order_id} saved locally")
+
+# ========== USER AUTHENTICATION ==========
+from passlib.context import CryptContext
+from jose import JWTError, jwt
+from datetime import datetime, timedelta
+import os
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-me")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+
+# In-memory user store (you can later move to SQLite, but for now keep simple)
+# Structure: { "username": {"hashed_password": "...", "user_id": 1, "bots": ["restaurant", ...]} }
+_users_db = {}
+_next_user_id = 1
+
+def hash_password(password):
+    return pwd_context.hash(password)
+
+def verify_password(plain, hashed):
+    return pwd_context.verify(plain, hashed)
+
+def create_user(username: str, password: str):
+    global _next_user_id
+    if username in _users_db:
+        return None
+    _users_db[username] = {
+        "user_id": _next_user_id,
+        "hashed_password": hash_password(password),
+        "bots": []  # list of bot names owned by this user
+    }
+    _next_user_id += 1
+    return _users_db[username]
+
+def get_user(username: str):
+    return _users_db.get(username)
+
+def authenticate_user(username: str, password: str):
+    user = get_user(username)
+    if not user:
+        return False
+    if not verify_password(password, user["hashed_password"]):
+        return False
+    return user
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def decode_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        return None

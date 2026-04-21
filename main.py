@@ -7,6 +7,11 @@ import uvicorn
 import stripe
 from config import STRIPE_SECRET_KEY
 from session import SharedSession
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from db import authenticate_user, create_access_token, get_user, decode_token, _users_db
+
+security = HTTPBearer()
 
 stripe.api_key = STRIPE_SECRET_KEY
 
@@ -24,6 +29,37 @@ if os.path.exists(static_dir):
 else:
     print(f"⚠️ CMS static directory not found at {static_dir}")
 # ====================================
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    payload = decode_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    username = payload.get("sub")
+    user = get_user(username)
+    if not user:
+        raise HTTPException(status_code=401)
+    return user
+
+@app.post("/auth/register")
+def register(username: str, password: str):
+    from db import create_user
+    user = create_user(username, password)
+    if not user:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    return {"msg": "User created"}
+
+@app.post("/auth/login")
+def login(username: str, password: str):
+    user = authenticate_user(username, password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = create_access_token({"sub": username})
+    return {"access_token": token, "token_type": "bearer"}
+
+@app.get("/auth/me")
+def me(current_user: dict = Depends(get_current_user)):
+    return {"username": current_user, "user_id": current_user["user_id"], "bots": current_user["bots"]}
 
 # ========== CMS ROUTES (if exists) ==========
 try:
