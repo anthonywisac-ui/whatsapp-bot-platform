@@ -66,7 +66,7 @@ def me(current_user: User = Depends(get_current_user)):
 # ========== Initial Admin Creation (only if no users) ==========
 @app.on_event("startup")
 def create_initial_admin():
-    from database import SessionLocal, User
+    from db import SessionLocal, User
     db = SessionLocal()
     if db.query(User).count() == 0:
         admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
