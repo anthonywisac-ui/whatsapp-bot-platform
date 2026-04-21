@@ -42,6 +42,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     token = create_access_token({"sub": user.username})
     return {"access_token": token, "token_type": "bearer"}
 
+@router.get("/setup")
 @router.post("/setup")
 def setup_admin():
     # First-time setup – create admin user if none exists
