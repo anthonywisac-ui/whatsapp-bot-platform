@@ -1,121 +1,99 @@
 import os
 import importlib
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import PlainTextResponse
-import uvicorn
-import stripe
-from pydantic import BaseModel
-from config import STRIPE_SECRET_KEY
-from session import SharedSession
-from fastapi import Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from db import authenticate_user, create_access_token, get_user, decode_token, _users_db
-from crm_backend import router as crm_router
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from db import get_db, get_user_by_username, authenticate_user, create_access_token, decode_token, create_user, User
+import uvicorn
 
+app = FastAPI()
+
+# Security
 security = HTTPBearer()
 
-stripe.api_key = STRIPE_SECRET_KEY
-
-BOT_TYPE = os.getenv("BOT_TYPE", "restaurant")
-
-# Dynamically import the bot's module
-bot_module = importlib.import_module(f"bots.{BOT_TYPE}.main")
-app = bot_module.app
-app.include_router(crm_router)
-# ========== ADD THIS BLOCK ==========
-static_dir = os.path.join(os.path.dirname(__file__), "cms", "static")
-if os.path.exists(static_dir):
-    app.mount("/cms/static", StaticFiles(directory=static_dir, html=True), name="cms_static")
-    print("✅ CMS static files mounted")
-else:
-    print(f"⚠️ CMS static directory not found at {static_dir}")
-# ====================================
-
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     token = credentials.credentials
     payload = decode_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid token")
     username = payload.get("sub")
-    user = get_user(username)
+    if not username:
+        raise HTTPException(status_code=401)
+    user = get_user_by_username(db, username)
     if not user:
         raise HTTPException(status_code=401)
     return user
+
+# Auth models
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
 class RegisterRequest(BaseModel):
     username: str
     password: str
 
+@app.post("/auth/login")
+def login(req: LoginRequest, db: Session = Depends(get_db)):
+    user = authenticate_user(db, req.username, req.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = create_access_token({"sub": user.username})
+    return {"access_token": token, "token_type": "bearer"}
+
 @app.post("/auth/register")
-def register(req: RegisterRequest):
-    user = create_user(req.username, req.password, role="user")
+def register(req: RegisterRequest, db: Session = Depends(get_db)):
+    user = create_user(db, req.username, req.password, role="user")
     if not user:
         raise HTTPException(status_code=400, detail="Username exists")
     return {"msg": "User created"}
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-@app.post("/auth/login")
-def login(req: LoginRequest):
-    user = authenticate_user(req.username, req.password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = create_access_token({"sub": req.username})
-    return {"access_token": token, "token_type": "bearer"}
-
 @app.get("/auth/me")
-def me(current_user: dict = Depends(get_current_user)):
-    # current_user already contains the user dict, but the key 'username' is missing
-    # Instead, extract username from the token or from the user dict's stored key
-    # For now, hardcode for admin:
-    username = "admin"  # or retrieve from token
+def me(current_user: User = Depends(get_current_user)):
     return {
-        "username": username,
-        "role": current_user.get("role", "user"),
-        "user_id": current_user.get("user_id"),
-        "bots": current_user.get("bots", [])
+        "username": current_user.username,
+        "role": current_user.role,
+        "user_id": current_user.id,
+        "bots": [bot.name for bot in current_user.bots]
     }
 
-@app.get("/create-admin")
-def create_admin():
-    from db import create_user
-    user = create_user("admin", "your_strong_password", role="admin")
-    if user:
-        return {"msg": "Admin user created"}
-    else:
-        return {"msg": "Admin already exists"}
+# Initial admin creation – only if no users exist
+@app.on_event("startup")
+def create_initial_admin():
+    db = next(get_db())
+    if db.query(User).count() == 0:
+        admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
+        create_user(db, "admin", admin_password, role="admin")
+        print("✅ Initial admin created (username: admin)")
 
+# Bot type validation
+ALLOWED_BOT_TYPES = ["restaurant", "order", "appointment", "real_estate", "ecommerce", "hair_salon", "gym"]
 
-@app.get("/debug-users")
-def debug_users():
-    from db import _users_db
-    # Return only usernames (no passwords)
-    return {"users": list(_users_db.keys())}
+def load_bot_module(bot_type: str):
+    if bot_type not in ALLOWED_BOT_TYPES:
+        raise ValueError(f"Invalid BOT_TYPE: {bot_type}. Allowed: {ALLOWED_BOT_TYPES}")
+    return importlib.import_module(f"bots.{bot_type}.main")
 
-@app.get("/fix-admin")
-def fix_admin():
-    from db import _users_db, create_user
-    # Delete old admin if exists
-    if 'admin' in _users_db:
-        del _users_db['admin']
-    # Create fresh admin
-    user = create_user('admin', '123456', role='admin')
-    return {"msg": "Admin recreated", "user": user, "all_users": list(_users_db.keys())}
-
-# ========== CMS ROUTES (if exists) ==========
+BOT_TYPE = os.getenv("BOT_TYPE", "restaurant")
 try:
-    from cms.routes import router as cms_router
-    app.include_router(cms_router)
-    print("✅ CMS routes mounted")
-except ImportError:
-    print("⚠️ CMS module not found, skipping")
+    bot_module = load_bot_module(BOT_TYPE)
+    app.mount("/", bot_module.app)  # mount bot routes
+except Exception as e:
+    print(f"⚠️ Bot module not loaded: {e}")
 
-@app.on_event("shutdown")
-async def shutdown():
-    await SharedSession.close_session()
+# Static files (CMS)
+static_dir = os.path.join(os.path.dirname(__file__), "cms", "static")
+if os.path.exists(static_dir):
+    app.mount("/cms/static", StaticFiles(directory=static_dir, html=True), name="cms_static")
+
+# Include CRM routes (you already have crm_backend.py)
+try:
+    from crm_backend import router as crm_router
+    app.include_router(crm_router)
+except ImportError:
+    print("⚠️ CRM backend not found")
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))

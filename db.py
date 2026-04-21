@@ -1,77 +1,24 @@
-# db.py - In-memory storage (from your original)
-import time
-import aiohttp
-from config import MANAGER_NUMBER
-
-customer_sessions = {}
-last_message_time = {}
-saved_orders = {}
-customer_order_lookup = {}
-manager_pending = {}
-customer_profiles = {}
-
-def save_profile(sender, session):
-    if session.get("name"):
-        profile = customer_profiles.get(sender, {"order_history": []})
-        profile.update({
-            "name": session.get("name", ""),
-            "address": session.get("address", ""),
-            "lang": session.get("lang", "en"),
-            "delivery_type": session.get("delivery_type", ""),
-            "payment": session.get("payment", ""),
-        })
-        if "order_history" not in profile:
-            profile["order_history"] = []
-        customer_profiles[sender] = profile
-
-def add_to_order_history(sender, order_id, order_items):
-    profile = customer_profiles.get(sender, {"order_history": []})
-    if "order_history" not in profile:
-        profile["order_history"] = []
-    profile["order_history"].append({
-        "order_id": order_id,
-        "items": [
-            {"item_id": k, "name": v["item"]["name"], "qty": v["qty"]}
-            for k, v in order_items.items()
-        ],
-        "timestamp": time.time()
-    })
-    profile["order_history"] = profile["order_history"][-5:]
-    customer_profiles[sender] = profile
-
-def get_favorite_items(sender):
-    profile = customer_profiles.get(sender, {})
-    history = profile.get("order_history", [])
-    if not history:
-        return []
-    item_counts = {}
-    for order in history:
-        for item in order.get("items", []):
-            name = item.get("name") if isinstance(item, dict) else item
-            if name:
-                item_counts[name] = item_counts.get(name, 0) + 1
-    sorted_items = sorted(item_counts.items(), key=lambda x: x[1], reverse=True)
-    return [item for item, count in sorted_items[:3]]
-
-async def save_to_sheet(customer_number, session, order_id):
-    # Placeholder - implement Google Sheets if needed
-    print(f"Order #{order_id} saved locally")
-
-# ========== USER AUTHENTICATION ==========
+# db.py – SQLAlchemy models + session management
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Boolean, ForeignKey
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, relationship
+from datetime import datetime
+import os
 from passlib.context import CryptContext
 from jose import JWTError, jwt
-from datetime import datetime, timedelta
-import os
+import json
 
+# ========== Database Setup ==========
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./crm.db")
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# ========== Password & JWT ==========
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-me")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
-
-# In-memory user store (you can later move to SQLite, but for now keep simple)
-# Structure: { "username": {"hashed_password": "...", "user_id": 1, "bots": ["restaurant", ...]} }
-_users_db = {}
-_next_user_id = 1
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
 def hash_password(password):
     return pwd_context.hash(password)
@@ -79,64 +26,158 @@ def hash_password(password):
 def verify_password(plain, hashed):
     return pwd_context.verify(plain, hashed)
 
-def create_user(username, password, role="user"):
-    global _next_user_id
-    if username in _users_db:
-        return None
-    _users_db[username] = {
-        "user_id": _next_user_id,
-        "username": username,   # <-- add this line
-        "hashed_password": hash_password(password),
-        "bots": [],
-        "role": role
-    }
-    _next_user_id += 1
-    return _users_db[username]
-
-# Modify create_user
-def create_user(username: str, password: str, role: str = "user"):
-    # role can be "admin" or "user"
-    _users_db[username] = {
-        "user_id": _next_user_id,
-        "hashed_password": hash_password(password),
-        "bots": [],
-        "role": role
-    }
-
-    return _users_db[username]
-
-def get_user(username: str):
-    return _users_db.get(username)
-
-def authenticate_user(username: str, password: str):
-    user = get_user(username)
-    if not user:
-        return False
-    if not verify_password(password, user["hashed_password"]):
-        return False
-    return user
-
 def create_access_token(data: dict):
-    to_encode = data.copy()
+    from jose import jwt
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode = data.copy()
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def decode_token(token: str):
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
         return None
 
-# Temporary in-memory storage for CRM
-_contacts = []
-_contacts_id = 1
-_deals = []
-_deals_id = 1
-_calls = []
-_calls_id = 1
-_agents = []
-_agents_id = 1
-_agent_calls = []
-_agent_calls_id = 1
+# ========== Models ==========
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    role = Column(String, default="user")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    bots = relationship("Bot", back_populates="owner")
+    contacts = relationship("Contact", back_populates="owner")
+    deals = relationship("Deal", back_populates="owner")
+    calls = relationship("Call", back_populates="owner")
+    agents = relationship("Agent", back_populates="owner")
+
+class Bot(Base):
+    __tablename__ = "bots"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, unique=True, index=True)
+    bot_type = Column(String)
+    config_json = Column(Text)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    owner = relationship("User", back_populates="bots")
+
+class Contact(Base):
+    __tablename__ = "contacts"
+    id = Column(Integer, primary_key=True)
+    first_name = Column(String)
+    last_name = Column(String)
+    company = Column(String, default="")
+    email = Column(String, default="")
+    phone = Column(String, default="")
+    status = Column(String, default="New")
+    source = Column(String, default="Manual")
+    notes = Column(Text, default="")
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    owner = relationship("User", back_populates="contacts")
+
+class Deal(Base):
+    __tablename__ = "deals"
+    id = Column(Integer, primary_key=True)
+    title = Column(String, default="New Deal")
+    company = Column(String, default="")
+    contact_name = Column(String, default="")
+    value = Column(Float, default=0.0)
+    stage = Column(String, default="Discovery")
+    probability = Column(Integer, default=20)
+    expected_close = Column(DateTime, nullable=True)
+    notes = Column(Text, default="")
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    owner = relationship("User", back_populates="deals")
+
+class Call(Base):
+    __tablename__ = "calls"
+    id = Column(Integer, primary_key=True)
+    contact_name = Column(String, default="Unknown")
+    phone = Column(String, default="")
+    direction = Column(String, default="Inbound")
+    duration_minutes = Column(Float, default=0.0)
+    outcome = Column(String, default="Resolved")
+    agent = Column(String, default="")
+    notes = Column(Text, default="")
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    call_date = Column(DateTime, default=datetime.utcnow)
+    owner = relationship("User", back_populates="calls")
+
+class Agent(Base):
+    __tablename__ = "agents"
+    id = Column(Integer, primary_key=True)
+    agent_id = Column(String, unique=True, index=True)
+    agent_name = Column(String)
+    description = Column(String, default="")
+    fields = Column(Text, default="[]")
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    owner = relationship("User", back_populates="agents")
+
+class AgentCall(Base):
+    __tablename__ = "agent_calls"
+    id = Column(Integer, primary_key=True)
+    call_id = Column(String, unique=True)
+    agent_id = Column(String)
+    agent_name = Column(String)
+    contact_name = Column(String, default="Unknown")
+    phone = Column(String, default="")
+    email = Column(String, default="")
+    duration_min = Column(Float, default=0.0)
+    lead_score = Column(String, default="New")
+    transcript = Column(Text, default="")
+    structured = Column(Text, default="{}")
+    summary = Column(Text, default="")
+    contact_ref = Column(Integer, nullable=True)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    call_date = Column(DateTime, default=datetime.utcnow)
+    owner = relationship("User")
+
+# Create tables
+Base.metadata.create_all(bind=engine)
+
+# ========== Database Helpers ==========
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# User CRUD
+def get_user_by_username(db, username):
+    return db.query(User).filter(User.username == username).first()
+
+def create_user(db, username, password, role="user"):
+    if get_user_by_username(db, username):
+        return None
+    hashed = hash_password(password)
+    user = User(username=username, hashed_password=hashed, role=role)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+def authenticate_user(db, username, password):
+    user = get_user_by_username(db, username)
+    if not user or not verify_password(password, user.hashed_password):
+        return None
+    return user
+
+# Bot CRUD (example – add others as needed)
+def get_bot_by_name(db, name, owner_id):
+    return db.query(Bot).filter(Bot.name == name, Bot.owner_id == owner_id).first()
+
+def create_bot(db, name, bot_type, config_json, owner_id):
+    bot = Bot(name=name, bot_type=bot_type, config_json=json.dumps(config_json), owner_id=owner_id)
+    db.add(bot)
+    db.commit()
+    db.refresh(bot)
+    return bot
+
+def get_bots_for_user(db, owner_id):
+    return db.query(Bot).filter(Bot.owner_id == owner_id).all()
