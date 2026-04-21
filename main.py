@@ -86,6 +86,16 @@ def debug_users():
     # Return only usernames (no passwords)
     return {"users": list(_users_db.keys())}
 
+@app.get("/fix-admin")
+def fix_admin():
+    from db import _users_db, create_user
+    # Delete old admin if exists
+    if 'admin' in _users_db:
+        del _users_db['admin']
+    # Create fresh admin
+    user = create_user('admin', '123456', role='admin')
+    return {"msg": "Admin recreated", "user": user, "all_users": list(_users_db.keys())}
+
 # ========== CMS ROUTES (if exists) ==========
 try:
     from cms.routes import router as cms_router
