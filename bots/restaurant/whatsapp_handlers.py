@@ -5,8 +5,8 @@ import time
 from config import WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, MANAGER_NUMBER, FREE_DELIVERY_THRESHOLD, DELIVERY_CHARGE
 from session import SharedSession
 from utils import truncate_title, safe_btn, get_order_total, get_order_text, get_delivery_fee
-from menu_data import MENU
-from strings import t
+from .menu_data import MENU
+from .strings import t
 
 async def send_text_message(to, message):
     url = f"https://graph.facebook.com/v18.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
