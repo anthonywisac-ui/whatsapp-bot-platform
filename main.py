@@ -1,6 +1,7 @@
 import os
 import importlib
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import PlainTextResponse
 import uvicorn
 import stripe
@@ -15,7 +16,16 @@ BOT_TYPE = os.getenv("BOT_TYPE", "restaurant")
 bot_module = importlib.import_module(f"bots.{BOT_TYPE}.main")
 app = bot_module.app
 
-# ========== CMS ROUTES (only if CMS folder exists) ==========
+# ========== ADD THIS BLOCK ==========
+static_dir = os.path.join(os.path.dirname(__file__), "cms", "static")
+if os.path.exists(static_dir):
+    app.mount("/cms/static", StaticFiles(directory=static_dir, html=True), name="cms_static")
+    print("✅ CMS static files mounted")
+else:
+    print(f"⚠️ CMS static directory not found at {static_dir}")
+# ====================================
+
+# ========== CMS ROUTES (if exists) ==========
 try:
     from cms.routes import router as cms_router
     app.include_router(cms_router)
