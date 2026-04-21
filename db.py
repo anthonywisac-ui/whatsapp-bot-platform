@@ -125,3 +125,15 @@ def decode_token(token: str):
         return payload
     except JWTError:
         return None
+
+# Temporary in-memory storage for CRM
+_contacts = []
+_contacts_id = 1
+_deals = []
+_deals_id = 1
+_calls = []
+_calls_id = 1
+_agents = []
+_agents_id = 1
+_agent_calls = []
+_agent_calls_id = 1
