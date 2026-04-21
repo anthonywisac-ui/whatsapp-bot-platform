@@ -5,7 +5,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from database import (
+from db import (
     get_db, get_user_by_username, authenticate_user,
     create_access_token, decode_token, create_user, User
 )
