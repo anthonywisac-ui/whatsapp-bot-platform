@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wild Automations CRM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+        .kanban-col { min-width: 260px; }
+        .transition-all { transition: all 0.2s ease; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 font-sans">
+
+<!-- ==================== LOGIN / REGISTER ==================== -->
+<div id="authContainer" class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-8">
+        <div class="text-center mb-6">
+            <i class="fab fa-whatsapp text-5xl text-green-500"></i>
+            <h2 class="text-2xl font-bold mt-2">CRM + Bot Manager</h2>
+        </div>
+        <div class="mb-4 flex border-b border-gray-700">
+            <button id="loginTabBtn" class="flex-1 py-2 text-center font-semibold text-green-400 border-b-2 border-green-400">Login</button>
+            <button id="registerTabBtn" class="flex-1 py-2 text-center font-semibold text-gray-400">Register</button>
+        </div>
+        <div id="loginForm">
+            <input type="text" id="loginUsername" placeholder="Username" class="w-full mb-3 px-4 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-green-500">
+            <input type="password" id="loginPassword" placeholder="Password" class="w-full mb-4 px-4 py-2 bg-gray-700 rounded-lg">
+            <button onclick="login()" class="w-full bg-green-600 hover:bg-green-700 py-2 rounded-lg font-bold">Login</button>
+            <div id="loginError" class="text-red-400 text-sm mt-2 text-center"></div>
+        </div>
+        <div id="registerForm" class="hidden">
+            <input type="text" id="regUsername" placeholder="Username" class="w-full mb-3 px-4 py-2 bg-gray-700 rounded-lg">
+            <input type="password" id="regPassword" placeholder="Password" class="w-full mb-4 px-4 py-2 bg-gray-700 rounded-lg">
+            <button onclick="register()" class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded-lg font-bold">Register</button>
+            <div id="registerError" class="text-red-400 text-sm mt-2 text-center"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== MAIN DASHBOARD ==================== -->
+<div id="dashboardContainer" class="hidden">
+    <!-- Sidebar + Main layout -->
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
+            <div class="p-4 border-b border-gray-700">
+                <div class="flex items-center gap-3">
+                    <i class="fab fa-whatsapp text-2xl text-green-500"></i>
+                    <span class="font-bold text-lg">Wild CRM</span>
+                </div>
+                <div class="text-xs text-gray-400 mt-1" id="userRoleBadge"></div>
+            </div>
+            <nav class="flex-1 p-3 space-y-1">
+                <button onclick="showTab('dashboard')" data-tab="dashboard" class="sidebar-btn w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 hover:bg-gray-700 transition"><i class="fas fa-tachometer-alt w-5"></i> Dashboard</button>
+                <button onclick="showTab('contacts')" data-tab="contacts" class="sidebar-btn w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 hover:bg-gray-700 transition"><i class="fas fa-users w-5"></i> Contacts</button>
+                <button onclick="showTab('pipeline')" data-tab="pipeline" class="sidebar-btn w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 hover:bg-gray-700 transition"><i class="fas fa-chart-line w-5"></i> Pipeline</button>
+                <button onclick="showTab('calls')" data-tab="calls" class="sidebar-btn w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 hover:bg-gray-700 transition"><i class="fas fa-phone-alt w-5"></i> Call Center</button>
+                <button onclick="showTab('ai')" data-tab="ai" class="sidebar-btn w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 hover:bg-gray-700 transition"><i class="fas fa-robot w-5"></i> AI Assistant</button>
+                <button onclick="showTab('agents')" data-tab="agents" class="sidebar-btn w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 hover:bg-gray-700 transition"><i class="fas fa-microphone-alt w-5"></i> Vapi Agents</button>
+                <button onclick="showTab('webhook')" data-tab="webhook" class="sidebar-btn w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 hover:bg-gray-700 transition"><i class="fas fa-plug w-5"></i> Webhook Live</button>
+                <!-- Bot Management (admin only) -->
+                <div id="adminBotSection" class="hidden pt-4 mt-2 border-t border-gray-700">
+                    <div class="text-xs text-gray-400 px-3 mb-2">BOT MANAGEMENT</div>
+                    <button onclick="showTab('bot_create')" data-tab="bot_create" class="sidebar-btn w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 hover:bg-gray-700 transition"><i class="fas fa-plus-circle w-5"></i> Create Bot</button>
+                    <button onclick="showTab('bot_assign')" data-tab="bot_assign" class="sidebar-btn w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 hover:bg-gray-700 transition"><i class="fas fa-user-plus w-5"></i> Assign Bot</button>
+                    <button onclick="showTab('bot_list')" data-tab="bot_list" class="sidebar-btn w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 hover:bg-gray-700 transition"><i class="fas fa-list w-5"></i> All Bots</button>
+                </div>
+            </nav>
+            <div class="p-4 border-t border-gray-700 flex items-center justify-between">
+                <span id="sidebarUser" class="text-sm truncate"></span>
+                <button onclick="logout()" class="text-red-400 hover:text-red-300 text-sm"><i class="fas fa-sign-out-alt"></i></button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 overflow-y-auto">
+            <div id="tab-dashboard" class="tab-content p-6">
+                <h1 class="text-2xl font-bold mb-4">Dashboard</h1>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8" id="statsCards">
+                    <div class="bg-gray-800 p-5 rounded-xl"><div class="text-gray-400 text-sm">Total Contacts</div><div class="text-3xl font-bold text-green-400" id="statContacts">0</div></div>
+                    <div class="bg-gray-800 p-5 rounded-xl"><div class="text-gray-400 text-sm">Pipeline Value</div><div class="text-3xl font-bold text-blue-400" id="statPipeline">$0</div></div>
+                    <div class="bg-gray-800 p-5 rounded-xl"><div class="text-gray-400 text-sm">Deals</div><div class="text-3xl font-bold text-yellow-400" id="statDeals">0</div></div>
+                    <div class="bg-gray-800 p-5 rounded-xl"><div class="text-gray-400 text-sm">Hot Leads</div><div class="text-3xl font-bold text-red-400" id="statHotLeads">0</div></div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-gray-800 rounded-xl p-5"><h3 class="font-semibold mb-3">Recent Contacts</h3><div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-gray-400"><tr><th>Name</th><th>Company</th><th>Status</th></tr></thead><tbody id="recentContacts"></tbody></table></div></div>
+                    <div class="bg-gray-800 rounded-xl p-5"><h3 class="font-semibold mb-3">Active Deals</h3><div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-gray-400"><tr><th>Deal</th><th>Value</th><th>Stage</th></tr></thead><tbody id="recentDeals"></tbody></table></div></div>
+                </div>
+            </div>
+
+            <div id="tab-contacts" class="tab-content hidden p-6">
+                <div class="flex justify-between items-center mb-4"><h1 class="text-2xl font-bold">Contacts</h1><button onclick="openContactForm()" class="bg-green-600 px-4 py-2 rounded-lg"><i class="fas fa-plus mr-2"></i>Add Contact</button></div>
+                <div class="bg-gray-800 rounded-xl overflow-hidden"><table class="w-full text-sm"><thead class="bg-gray-700 text-gray-300"><tr><th class="p-3 text-left">Name</th><th>Company</th><th>Status</th><th>Source</th><th>Phone</th><th>Actions</th></tr></thead><tbody id="contactsTable"></tbody></table></div>
+                <div id="contactFormModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"><div class="bg-gray-800 rounded-xl p-6 w-full max-w-md"><h3 class="text-xl font-bold mb-4">Contact</h3><input id="contactId" type="hidden"><input id="contactFirstName" placeholder="First Name" class="w-full mb-2 p-2 bg-gray-700 rounded"><input id="contactLastName" placeholder="Last Name" class="w-full mb-2 p-2 bg-gray-700 rounded"><input id="contactCompany" placeholder="Company" class="w-full mb-2 p-2 bg-gray-700 rounded"><input id="contactEmail" placeholder="Email" class="w-full mb-2 p-2 bg-gray-700 rounded"><input id="contactPhone" placeholder="Phone" class="w-full mb-2 p-2 bg-gray-700 rounded"><select id="contactStatus" class="w-full mb-2 p-2 bg-gray-700 rounded"><option>New</option><option>Warm</option><option>Hot Lead</option><option>Cold</option></select><div class="flex justify-end gap-2 mt-4"><button onclick="saveContact()" class="bg-green-600 px-4 py-2 rounded">Save</button><button onclick="closeContactForm()" class="bg-gray-600 px-4 py-2 rounded">Cancel</button></div></div></div>
+            </div>
+
+            <div id="tab-pipeline" class="tab-content hidden p-6">
+                <div class="flex justify-between items-center mb-4"><h1 class="text-2xl font-bold">Sales Pipeline</h1><button onclick="openDealForm()" class="bg-green-600 px-4 py-2 rounded"><i class="fas fa-plus mr-2"></i>Add Deal</button></div>
+                <div class="flex gap-4 overflow-x-auto pb-4" id="kanbanBoard"></div>
+                <div id="dealFormModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"><div class="bg-gray-800 rounded-xl p-6 w-full max-w-md"><h3 class="text-xl font-bold mb-4">Deal</h3><input id="dealId" type="hidden"><input id="dealTitle" placeholder="Title" class="w-full mb-2 p-2 bg-gray-700 rounded"><input id="dealCompany" placeholder="Company" class="w-full mb-2 p-2 bg-gray-700 rounded"><input id="dealValue" placeholder="Value" type="number" class="w-full mb-2 p-2 bg-gray-700 rounded"><select id="dealStage" class="w-full mb-2 p-2 bg-gray-700 rounded"><option>Discovery</option><option>Proposal</option><option>Negotiation</option><option>Closing</option><option>Lost</option></select><div class="flex justify-end gap-2 mt-4"><button onclick="saveDeal()" class="bg-green-600 px-4 py-2 rounded">Save</button><button onclick="closeDealForm()" class="bg-gray-600 px-4 py-2 rounded">Cancel</button></div></div></div>
+            </div>
+
+            <div id="tab-calls" class="tab-content hidden p-6">
+                <h1 class="text-2xl font-bold mb-4">Call Center</h1>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-gray-800 p-4 rounded-xl"><div class="text-gray-400">FCR</div><div class="text-2xl font-bold" id="kpiFcr">0%</div></div>
+                    <div class="bg-gray-800 p-4 rounded-xl"><div class="text-gray-400">AHT</div><div class="text-2xl font-bold" id="kpiAht">0:00</div></div>
+                    <div class="bg-gray-800 p-4 rounded-xl"><div class="text-gray-400">Missed</div><div class="text-2xl font-bold" id="kpiMissed">0</div></div>
+                    <div class="bg-gray-800 p-4 rounded-xl"><div class="text-gray-400">Total Calls</div><div class="text-2xl font-bold" id="kpiTotal">0</div></div>
+                </div>
+                <div class="bg-gray-800 rounded-xl p-4"><div class="flex justify-between items-center mb-3"><h3 class="font-semibold">Call Log</h3><button onclick="openCallForm()" class="bg-green-600 px-3 py-1 rounded text-sm">+ Log Call</button></div><div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-gray-400"><tr><th>Contact</th><th>Direction</th><th>Duration</th><th>Outcome</th><th>Agent</th><th>Time</th></tr></thead><tbody id="callsTable"></tbody></table></div></div>
+                <div id="callFormModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"><div class="bg-gray-800 rounded-xl p-6 w-full max-w-md"><h3 class="text-xl font-bold mb-4">Log Call</h3><input id="callContact" placeholder="Contact Name" class="w-full mb-2 p-2 bg-gray-700 rounded"><input id="callPhone" placeholder="Phone" class="w-full mb-2 p-2 bg-gray-700 rounded"><select id="callDirection" class="w-full mb-2 p-2 bg-gray-700 rounded"><option>Inbound</option><option>Outbound</option><option>Missed</option></select><input id="callDuration" placeholder="Duration (min)" type="number" class="w-full mb-2 p-2 bg-gray-700 rounded"><select id="callOutcome" class="w-full mb-2 p-2 bg-gray-700 rounded"><option>Resolved</option><option>Follow-up</option><option>Escalated</option></select><input id="callAgent" placeholder="Agent" class="w-full mb-2 p-2 bg-gray-700 rounded"><div class="flex justify-end gap-2 mt-4"><button onclick="saveCall()" class="bg-green-600 px-4 py-2 rounded">Save</button><button onclick="closeCallForm()" class="bg-gray-600 px-4 py-2 rounded">Cancel</button></div></div></div>
+            </div>
+
+            <div id="tab-ai" class="tab-content hidden p-6">
+                <div class="flex justify-between items-center mb-4"><h1 class="text-2xl font-bold">AI Assistant</h1><div><span id="aiProvider" class="text-sm bg-gray-700 px-3 py-1 rounded-full">Free: Gemini/Groq</span></div></div>
+                <div class="bg-gray-800 rounded-xl h-96 overflow-y-auto p-4 mb-4" id="chatMessages"><div class="flex gap-3 mb-4"><div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center">AI</div><div class="bg-gray-700 p-3 rounded-xl max-w-lg">Ask me about your CRM data. I can answer questions about contacts, deals, calls, and bots.</div></div></div>
+                <div class="flex gap-2"><textarea id="chatInput" rows="2" class="flex-1 bg-gray-700 rounded-lg p-2" placeholder="Ask something..."></textarea><button onclick="sendChat()" class="bg-green-600 px-4 py-2 rounded-lg">Send</button></div>
+            </div>
+
+            <div id="tab-agents" class="tab-content hidden p-6">
+                <h1 class="text-2xl font-bold mb-4">Vapi Agents</h1>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-gray-800 p-4 rounded-xl"><div class="text-gray-400">Total Agents</div><div id="agentCount" class="text-2xl font-bold">0</div></div>
+                    <div class="bg-gray-800 p-4 rounded-xl"><div class="text-gray-400">Total Calls</div><div id="agentTotalCalls" class="text-2xl font-bold">0</div></div>
+                    <div class="bg-gray-800 p-4 rounded-xl"><div class="text-gray-400">Hot Leads</div><div id="agentHotLeads" class="text-2xl font-bold">0</div></div>
+                </div>
+                <div class="bg-gray-800 rounded-xl p-4"><div class="flex justify-between items-center mb-3"><h3 class="font-semibold">Agent Calls</h3><button onclick="openAgentForm()" class="bg-green-600 px-3 py-1 rounded text-sm">+ Add Agent</button></div><div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-gray-400"><tr><th>Agent</th><th>Contact</th><th>Score</th><th>Duration</th><th>Key Data</th></tr></thead><tbody id="agentCallsTable"></tbody></table></div></div>
+            </div>
+
+            <div id="tab-webhook" class="tab-content hidden p-6">
+                <h1 class="text-2xl font-bold mb-4">Webhook Live Feed</h1>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-gray-800 p-4 rounded-xl"><div class="text-gray-400">Webhook Port</div><div id="whPort" class="text-xl font-bold">8000</div></div>
+                    <div class="bg-gray-800 p-4 rounded-xl"><div class="text-gray-400">Events Today</div><div id="whEvents" class="text-xl font-bold">0</div></div>
+                    <div class="bg-gray-800 p-4 rounded-xl"><div class="text-gray-400">Tunnel Status</div><div id="tunnelStatus" class="text-xl font-bold text-yellow-400">Connecting...</div></div>
+                </div>
+                <div class="bg-gray-800 rounded-xl p-4"><div class="flex justify-between items-center mb-3"><h3 class="font-semibold">Live Events</h3><button onclick="clearWebhookLog()" class="bg-gray-600 px-3 py-1 rounded text-sm">Clear</button></div><div id="webhookLog" class="h-64 overflow-y-auto space-y-2 text-sm"></div></div>
+            </div>
+
+            <!-- Bot Management (Admin only) -->
+            <div id="tab-bot_create" class="tab-content hidden p-6"><h1 class="text-2xl font-bold mb-4">Create New Bot</h1><div class="bg-gray-800 rounded-xl p-6 max-w-2xl"><input id="newBotName" placeholder="Bot Name (unique, lowercase)" class="w-full mb-3 p-2 bg-gray-700 rounded"><select id="newBotType" class="w-full mb-3 p-2 bg-gray-700 rounded"><option value="order">Order (Restaurant, Flowers, Cake)</option><option value="appointment">Appointment (Salon, Gym, Real Estate)</option></select><input id="newManagerNumber" placeholder="Manager WhatsApp (with country code)" class="w-full mb-3 p-2 bg-gray-700 rounded"><textarea id="newMenuJson" rows="4" placeholder='{"fastfood":{"name":"Burgers","items":{"FF1":{"name":"Burger","price":9.99}}}}' class="w-full mb-3 p-2 bg-gray-700 rounded font-mono text-sm"></textarea><textarea id="newStringsJson" rows="3" placeholder='{"en":{"welcome":"Welcome"}}' class="w-full mb-3 p-2 bg-gray-700 rounded font-mono text-sm"></textarea><button onclick="createBot()" class="bg-green-600 px-6 py-2 rounded-lg">Generate Bot</button><div id="botCreateMsg" class="mt-3 text-sm"></div></div></div>
+            <div id="tab-bot_assign" class="tab-content hidden p-6"><h1 class="text-2xl font-bold mb-4">Assign Bot to User</h1><div class="bg-gray-800 rounded-xl p-6 max-w-md"><input id="assignBotName" placeholder="Bot Name" class="w-full mb-3 p-2 bg-gray-700 rounded"><input id="assignUsername" placeholder="Username" class="w-full mb-3 p-2 bg-gray-700 rounded"><button onclick="assignBot()" class="bg-blue-600 px-6 py-2 rounded-lg">Assign</button><div id="assignMsg" class="mt-3 text-sm"></div></div></div>
+            <div id="tab-bot_list" class="tab-content hidden p-6"><h1 class="text-2xl font-bold mb-4">All Bots</h1><div class="bg-gray-800 rounded-xl p-4"><div id="allBotsList" class="space-y-2"></div></div></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_BASE = window.location.origin;
+    let authToken = localStorage.getItem('token');
+    let currentUser = null;
+    let currentUserRole = 'user';
+    let eventCount = 0;
+
+    // Helper API call
+    async function apiCall(endpoint, method, body = null, auth = true) {
+        const headers = { 'Content-Type': 'application/json' };
+        if (auth && authToken) headers['Authorization'] = `Bearer ${authToken}`;
+        const options = { method, headers };
+        if (body) options.body = JSON.stringify(body);
+        const res = await fetch(`${API_BASE}${endpoint}`, options);
+        if (!res.ok) throw new Error((await res.json()).detail || 'Request failed');
+        return res.json();
+    }
+
+    // Auth
+    async function login() {
+        const username = document.getElementById('loginUsername').value;
+        const password = document.getElementById('loginPassword').value;
+        try {
+            const data = await apiCall('/auth/login', 'POST', { username, password }, false);
+            authToken = data.access_token;
+            localStorage.setItem('token', authToken);
+            await loadUserAndDashboard();
+        } catch(err) { document.getElementById('loginError').innerText = err.message; }
+    }
+    async function register() {
+        const username = document.getElementById('regUsername').value;
+        const password = document.getElementById('regPassword').value;
+        try {
+            await apiCall('/auth/register', 'POST', { username, password }, false);
+            const data = await apiCall('/auth/login', 'POST', { username, password }, false);
+            authToken = data.access_token;
+            localStorage.setItem('token', authToken);
+            await loadUserAndDashboard();
+        } catch(err) { document.getElementById('registerError').innerText = err.message; }
+    }
+    async function loadUserAndDashboard() {
+        const user = await apiCall('/auth/me', 'GET');
+        currentUser = user;
+        currentUserRole = user.role || 'user';
+        document.getElementById('sidebarUser').innerText = user.username;
+        document.getElementById('userRoleBadge').innerHTML = currentUserRole === 'admin' ? '<span class="bg-purple-600 text-xs px-2 py-0.5 rounded">Admin</span>' : '<span class="bg-gray-600 text-xs px-2 py-0.5 rounded">User</span>';
+        if (currentUserRole === 'admin') document.getElementById('adminBotSection').classList.remove('hidden');
+        else document.getElementById('adminBotSection').classList.add('hidden');
+        document.getElementById('authContainer').classList.add('hidden');
+        document.getElementById('dashboardContainer').classList.remove('hidden');
+        showTab('dashboard');
+        loadDashboardStats();
+        loadContacts();
+        loadPipeline();
+        loadCalls();
+        loadAgents();
+        loadWebhookInfo();
+        loadAllBots();
+    }
+    function logout() { localStorage.removeItem('token'); authToken = null; location.reload(); }
+
+    // Tab switching
+    function showTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+        document.querySelectorAll('.sidebar-btn').forEach(btn => btn.classList.remove('bg-gray-700'));
+        document.querySelector(`[data-tab="${tabId}"]`)?.classList.add('bg-gray-700');
+        if (tabId === 'dashboard') { loadDashboardStats(); loadRecentContacts(); loadRecentDeals(); }
+        if (tabId === 'contacts') loadContacts();
+        if (tabId === 'pipeline') loadPipeline();
+        if (tabId === 'calls') loadCalls();
+        if (tabId === 'agents') loadAgents();
+        if (tabId === 'bot_list') loadAllBots();
+    }
+
+    // Dashboard
+    async function loadDashboardStats() {
+        try {
+            const stats = await apiCall('/api/crm/stats', 'GET');
+            document.getElementById('statContacts').innerText = stats.contacts || 0;
+            document.getElementById('statPipeline').innerText = `$${stats.pipeline_value || 0}`;
+            document.getElementById('statDeals').innerText = stats.deals || 0;
+            document.getElementById('statHotLeads').innerText = stats.hot_leads || 0;
+        } catch(e) { console.error(e); }
+    }
+    async function loadRecentContacts() {
+        const contacts = await apiCall('/api/crm/contacts', 'GET');
+        const tbody = document.getElementById('recentContacts');
+        tbody.innerHTML = contacts.slice(0,5).map(c => `<tr><td class="p-2">${c.first_name} ${c.last_name}</td><td>${c.company||'-'}</td><td>${statusBadge(c.status)}</td></tr>`).join('');
+    }
+    async function loadRecentDeals() {
+        const deals = await apiCall('/api/crm/deals', 'GET');
+        const tbody = document.getElementById('recentDeals');
+        tbody.innerHTML = deals.filter(d => d.stage !== 'Lost').slice(0,5).map(d => `<tr><td class="p-2">${d.title}</td><td>$${d.value}</td><td>${stageBadge(d.stage)}</td></tr>`).join('');
+    }
+    function statusBadge(s) { const colors = {'Hot Lead':'bg-red-800','Warm':'bg-yellow-800','New':'bg-blue-800'}; return `<span class="px-2 py-0.5 rounded text-xs ${colors[s]||'bg-gray-700'}">${s}</span>`; }
+    function stageBadge(s) { const colors = {'Discovery':'bg-blue-800','Proposal':'bg-purple-800','Negotiation':'bg-yellow-800','Closing':'bg-green-800'}; return `<span class="px-2 py-0.5 rounded text-xs ${colors[s]||'bg-gray-700'}">${s}</span>`; }
+
+    // Contacts CRUD
+    async function loadContacts() {
+        const contacts = await apiCall('/api/crm/contacts', 'GET');
+        document.getElementById('contactsTable').innerHTML = contacts.map(c => `
+            <tr class="border-b border-gray-700"><td class="p-3">${c.first_name} ${c.last_name}</td><td>${c.company||'-'}</td><td>${statusBadge(c.status)}</td><td>${c.source||'-'}</td><td>${c.phone||'-'}</td><td><button onclick="editContact(${c.id})" class="text-blue-400"><i class="fas fa-edit"></i></button></td></tr>
+        `).join('');
+    }
+    function openContactForm() { document.getElementById('contactFormModal').classList.remove('hidden'); }
+    function closeContactForm() { document.getElementById('contactFormModal').classList.add('hidden'); document.getElementById('contactId').value = ''; }
+    async function saveContact() {
+        const data = { first_name: document.getElementById('contactFirstName').value, last_name: document.getElementById('contactLastName').value, company: document.getElementById('contactCompany').value, email: document.getElementById('contactEmail').value, phone: document.getElementById('contactPhone').value, status: document.getElementById('contactStatus').value };
+        const id = document.getElementById('contactId').value;
+        if (id) await apiCall(`/api/crm/contacts/${id}`, 'PUT', data);
+        else await apiCall('/api/crm/contacts', 'POST', data);
+        closeContactForm(); loadContacts(); loadDashboardStats();
+    }
+    async function editContact(id) {
+        const contacts = await apiCall('/api/crm/contacts', 'GET');
+        const c = contacts.find(x => x.id === id);
+        if (c) { document.getElementById('contactId').value = c.id; document.getElementById('contactFirstName').value = c.first_name; document.getElementById('contactLastName').value = c.last_name; document.getElementById('contactCompany').value = c.company; document.getElementById('contactEmail').value = c.email; document.getElementById('contactPhone').value = c.phone; document.getElementById('contactStatus').value = c.status; openContactForm(); }
+    }
+
+    // Pipeline (Kanban)
+    async function loadPipeline() {
+        const deals = await apiCall('/api/crm/deals', 'GET');
+        const stages = ['Discovery','Proposal','Negotiation','Closing','Lost'];
+        const board = document.getElementById('kanbanBoard');
+        board.innerHTML = stages.map(stage => {
+            const stageDeals = deals.filter(d => d.stage === stage);
+            return `<div class="kanban-col bg-gray-800 rounded-xl p-3 w-72 flex-shrink-0"><div class="font-bold mb-2">${stage} (${stageDeals.length})</div><div class="space-y-2">${stageDeals.map(d => `<div class="bg-gray-700 p-3 rounded-lg cursor-pointer" onclick="editDeal(${d.id})"><div class="font-medium">${d.title}</div><div class="text-green-400">$${d.value}</div><div class="text-xs text-gray-400">${d.probability}%</div></div>`).join('')}</div></div>`;
+        }).join('');
+    }
+    function openDealForm() { document.getElementById('dealFormModal').classList.remove('hidden'); }
+    function closeDealForm() { document.getElementById('dealFormModal').classList.add('hidden'); document.getElementById('dealId').value = ''; }
+    async function saveDeal() {
+        const data = { title: document.getElementById('dealTitle').value, company: document.getElementById('dealCompany').value, value: parseFloat(document.getElementById('dealValue').value), stage: document.getElementById('dealStage').value };
+        const id = document.getElementById('dealId').value;
+        if (id) await apiCall(`/api/crm/deals/${id}`, 'PUT', data);
+        else await apiCall('/api/crm/deals', 'POST', data);
+        closeDealForm(); loadPipeline(); loadDashboardStats();
+    }
+    async function editDeal(id) {
+        const deals = await apiCall('/api/crm/deals', 'GET');
+        const d = deals.find(x => x.id === id);
+        if (d) { document.getElementById('dealId').value = d.id; document.getElementById('dealTitle').value = d.title; document.getElementById('dealCompany').value = d.company; document.getElementById('dealValue').value = d.value; document.getElementById('dealStage').value = d.stage; openDealForm(); }
+    }
+
+    // Calls
+    async function loadCalls() {
+        const calls = await apiCall('/api/crm/calls', 'GET');
+        document.getElementById('callsTable').innerHTML = calls.slice(0,30).map(c => `<tr><td class="p-2">${c.contact_name}</td><td>${c.direction}</td><td>${c.duration_minutes} min</td><td>${c.outcome}</td><td>${c.agent||'-'}</td><td>${new Date(c.call_date).toLocaleTimeString()}</td></tr>`).join('');
+        const kpis = await apiCall('/api/crm/calls/kpis', 'GET');
+        document.getElementById('kpiFcr').innerText = kpis.fcr+'%';
+        document.getElementById('kpiAht').innerText = kpis.aht;
+        document.getElementById('kpiMissed').innerText = kpis.missed;
+        document.getElementById('kpiTotal').innerText = kpis.total;
+    }
+    function openCallForm() { document.getElementById('callFormModal').classList.remove('hidden'); }
+    function closeCallForm() { document.getElementById('callFormModal').classList.add('hidden'); }
+    async function saveCall() {
+        const data = { contact_name: document.getElementById('callContact').value, phone: document.getElementById('callPhone').value, direction: document.getElementById('callDirection').value, duration_minutes: parseFloat(document.getElementById('callDuration').value), outcome: document.getElementById('callOutcome').value, agent: document.getElementById('callAgent').value };
+        await apiCall('/api/crm/calls', 'POST', data);
+        closeCallForm(); loadCalls();
+    }
+
+    // AI Assistant
+    let chatHistory = [];
+    async function sendChat() {
+        const input = document.getElementById('chatInput');
+        const msg = input.value.trim();
+        if (!msg) return;
+        input.value = '';
+        appendChatMessage('user', msg);
+        chatHistory.push({role:'user', content:msg});
+        try {
+            const response = await apiCall('/api/crm/ai/chat', 'POST', { messages: chatHistory });
+            appendChatMessage('assistant', response.reply);
+            chatHistory.push({role:'assistant', content:response.reply});
+        } catch(e) { appendChatMessage('assistant', 'Error: '+e.message); }
+    }
+    function appendChatMessage(role, content) {
+        const container = document.getElementById('chatMessages');
+        const div = document.createElement('div');
+        div.className = `flex gap-3 mb-4 ${role === 'user' ? 'justify-end' : ''}`;
+        if (role === 'assistant') div.innerHTML = `<div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center">AI</div><div class="bg-gray-700 p-3 rounded-xl max-w-lg">${content}</div>`;
+        else div.innerHTML = `<div class="bg-green-800 p-3 rounded-xl max-w-lg">${content}</div><div class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">U</div>`;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    // Agents
+    async function loadAgents() {
+        const stats = await apiCall('/api/crm/agents/stats', 'GET');
+        document.getElementById('agentCount').innerText = stats.agents;
+        document.getElementById('agentTotalCalls').innerText = stats.total_calls;
+        document.getElementById('agentHotLeads').innerText = stats.hot_leads;
+        const calls = await apiCall('/api/crm/agents/calls', 'GET');
+        document.getElementById('agentCallsTable').innerHTML = calls.slice(0,20).map(c => `<tr><td class="p-2">${c.agent_name}</td><td>${c.contact_name}</td><td>${statusBadge(c.lead_score)}</td><td>${c.duration_min} min</td><td>${Object.keys(JSON.parse(c.structured||'{}')).slice(0,2).join(',')}</td></tr>`).join('');
+    }
+    function openAgentForm() { alert('Agent creation: implement via backend'); }
+
+    // Webhook
+    async function loadWebhookInfo() {
+        const port = await apiCall('/api/crm/webhook/port', 'GET');
+        document.getElementById('whPort').innerText = port;
+        // tunnel status would come from backend; for now placeholder
+        document.getElementById('tunnelStatus').innerHTML = '<span class="text-green-400">Active</span>';
+        // start polling events
+        setInterval(async () => {
+            const events = await apiCall('/api/crm/webhook/events', 'GET');
+            document.getElementById('whEvents').innerText = events.count;
+            if (events.last_event) addWebhookEvent(events.last_event);
+        }, 3000);
+    }
+    function addWebhookEvent(ev) {
+        const log = document.getElementById('webhookLog');
+        const div = document.createElement('div');
+        div.className = 'bg-gray-700 p-2 rounded text-sm';
+        div.innerHTML = `<span class="text-green-400">${ev.type}</span> ${ev.data}`;
+        log.prepend(div);
+        if (log.children.length > 50) log.removeChild(log.lastChild);
+    }
+    function clearWebhookLog() { document.getElementById('webhookLog').innerHTML = ''; }
+
+    // Bot management (admin)
+    async function createBot() {
+        const name = document.getElementById('newBotName').value.trim();
+        const botType = document.getElementById('newBotType').value;
+        const managerNumber = document.getElementById('newManagerNumber').value.trim();
+        let menuJson = document.getElementById('newMenuJson').value.trim();
+        let stringsJson = document.getElementById('newStringsJson').value.trim();
+        if (!menuJson) menuJson = '{"services":{"name":"Default","items":{"S1":{"name":"Service","price":10}}}}';
+        if (!stringsJson) stringsJson = '{"en":{"welcome":"Welcome"}}';
+        try {
+            await apiCall('/cms/bots', 'POST', { name, bot_type: botType, config_json: { bot_name: name, bot_type: botType, manager_number: managerNumber, menu: JSON.parse(menuJson), strings: JSON.parse(stringsJson) } });
+            document.getElementById('botCreateMsg').innerHTML = '<span class="text-green-400">Bot created!</span>';
+            loadAllBots();
+        } catch(e) { document.getElementById('botCreateMsg').innerHTML = '<span class="text-red-400">Error: '+e.message+'</span>'; }
+    }
+    async function assignBot() {
+        const botName = document.getElementById('assignBotName').value.trim();
+        const username = document.getElementById('assignUsername').value.trim();
+        try {
+            await apiCall('/cms/assign-bot', 'POST', { bot_name: botName, username });
+            document.getElementById('assignMsg').innerHTML = '<span class="text-green-400">Assigned!</span>';
+        } catch(e) { document.getElementById('assignMsg').innerHTML = '<span class="text-red-400">Error: '+e.message+'</span>'; }
+    }
+    async function loadAllBots() {
+        const bots = await apiCall('/cms/bots', 'GET');
+        document.getElementById('allBotsList').innerHTML = bots.map(b => `<div class="bg-gray-700 p-3 rounded-lg flex justify-between"><span>${b.name} (${b.type})</span><button onclick="deleteBot('${b.name}')" class="text-red-400">Delete</button></div>`).join('');
+    }
+    async function deleteBot(name) {
+        if (!confirm('Delete bot?')) return;
+        await apiCall(`/cms/bots/${name}`, 'DELETE');
+        loadAllBots();
+    }
+
+    // Auto login if token exists
+    if (authToken) { loadUserAndDashboard().catch(() => { localStorage.removeItem('token'); location.reload(); }); }
+    // Tab switcher listeners
+    window.showTab = showTab; window.login = login; window.register = register; window.logout = logout;
+    window.openContactForm = openContactForm; window.closeContactForm = closeContactForm; window.saveContact = saveContact; window.editContact = editContact;
+    window.openDealForm = openDealForm; window.closeDealForm = closeDealForm; window.saveDeal = saveDeal; window.editDeal = editDeal;
+    window.openCallForm = openCallForm; window.closeCallForm = closeCallForm; window.saveCall = saveCall;
+    window.sendChat = sendChat; window.openAgentForm = openAgentForm;
+    window.createBot = createBot; window.assignBot = assignBot; window.deleteBot = deleteBot;
+    window.clearWebhookLog = clearWebhookLog;
+</script>
+</body>
+</html>
