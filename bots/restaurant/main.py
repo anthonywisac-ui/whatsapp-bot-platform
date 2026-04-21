@@ -11,6 +11,11 @@ from .stripe_utils import handle_stripe_webhook
 from .menu_data import load_menu
 from .strings import load_strings
 from session import SharedSession
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from db import authenticate_user, create_access_token, get_user, decode_token, create_user
+
+security = HTTPBearer()
 
 stripe.api_key = STRIPE_SECRET_KEY
 
@@ -71,6 +76,36 @@ async def payment_success():
 @app.get("/cancel")
 async def payment_cancel():
     return HTMLResponse("<h1>Payment cancelled</h1>")
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    payload = decode_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    username = payload.get("sub")
+    user = get_user(username)
+    if not user:
+        raise HTTPException(status_code=401)
+    return user
+
+@app.post("/auth/login")
+def login(username: str, password: str):
+    user = authenticate_user(username, password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = create_access_token({"sub": username})
+    return {"access_token": token, "token_type": "bearer"}
+
+@app.post("/auth/register")
+def register(username: str, password: str):
+    user = create_user(username, password, role="user")
+    if not user:
+        raise HTTPException(status_code=400, detail="Username exists")
+    return {"msg": "User created"}
+
+@app.get("/auth/me")
+def me(current_user: dict = Depends(get_current_user)):
+    return {"username": current_user.get("username"), "role": current_user.get("role", "user"), "user_id": current_user.get("user_id")}
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))

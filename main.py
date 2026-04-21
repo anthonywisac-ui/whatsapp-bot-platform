@@ -5,12 +5,15 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from db import get_db, get_user_by_username, authenticate_user, create_access_token, decode_token, create_user, User
+from database import (
+    get_db, get_user_by_username, authenticate_user,
+    create_access_token, decode_token, create_user, User
+)
 import uvicorn
 
 app = FastAPI()
 
-# Security
+# ========== Security ==========
 security = HTTPBearer()
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
@@ -26,7 +29,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         raise HTTPException(status_code=401)
     return user
 
-# Auth models
+# ========== Auth Models ==========
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -35,6 +38,7 @@ class RegisterRequest(BaseModel):
     username: str
     password: str
 
+# ========== Auth Endpoints ==========
 @app.post("/auth/login")
 def login(req: LoginRequest, db: Session = Depends(get_db)):
     user = authenticate_user(db, req.username, req.password)
@@ -56,19 +60,21 @@ def me(current_user: User = Depends(get_current_user)):
         "username": current_user.username,
         "role": current_user.role,
         "user_id": current_user.id,
-        "bots": [bot.name for bot in current_user.bots]
+        "bots": current_user.bots  # from bots_json property
     }
 
-# Initial admin creation – only if no users exist
+# ========== Initial Admin Creation (only if no users) ==========
 @app.on_event("startup")
 def create_initial_admin():
-    db = next(get_db())
+    from database import SessionLocal, User
+    db = SessionLocal()
     if db.query(User).count() == 0:
         admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
         create_user(db, "admin", admin_password, role="admin")
         print("✅ Initial admin created (username: admin)")
+    db.close()
 
-# Bot type validation
+# ========== Bot Mounting (with validation) ==========
 ALLOWED_BOT_TYPES = ["restaurant", "order", "appointment", "real_estate", "ecommerce", "hair_salon", "gym"]
 
 def load_bot_module(bot_type: str):
@@ -79,21 +85,18 @@ def load_bot_module(bot_type: str):
 BOT_TYPE = os.getenv("BOT_TYPE", "restaurant")
 try:
     bot_module = load_bot_module(BOT_TYPE)
-    app.mount("/", bot_module.app)  # mount bot routes
+    app.mount("/", bot_module.app)  # mount bot routes (webhook etc.)
 except Exception as e:
     print(f"⚠️ Bot module not loaded: {e}")
 
-# Static files (CMS)
+# ========== Static Files (CMS) ==========
 static_dir = os.path.join(os.path.dirname(__file__), "cms", "static")
 if os.path.exists(static_dir):
     app.mount("/cms/static", StaticFiles(directory=static_dir, html=True), name="cms_static")
 
-# Include CRM routes (you already have crm_backend.py)
-try:
-    from crm_backend import router as crm_router
-    app.include_router(crm_router)
-except ImportError:
-    print("⚠️ CRM backend not found")
+# ========== CRM Routes (from crm_backend.py) ==========
+from crm_backend import router as crm_router
+app.include_router(crm_router)
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
