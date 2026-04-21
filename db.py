@@ -89,6 +89,17 @@ def create_user(username: str, password: str):
         "bots": []  # list of bot names owned by this user
     }
     _next_user_id += 1
+
+# Modify create_user
+def create_user(username: str, password: str, role: str = "user"):
+    # role can be "admin" or "user"
+    _users_db[username] = {
+        "user_id": _next_user_id,
+        "hashed_password": hash_password(password),
+        "bots": [],
+        "role": role
+    }
+
     return _users_db[username]
 
 def get_user(username: str):

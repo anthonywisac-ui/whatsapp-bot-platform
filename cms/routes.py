@@ -101,3 +101,9 @@ def delete_bot(bot_name: str, db: Session = Depends(get_db)):
     db.query(BotConfig).filter(BotConfig.name == bot_name).delete()
     db.commit()
     return {"message": f"Bot {bot_name} deleted"}
+
+@router.post("/assign-bot")
+def assign_bot(bot_name: str, username: str, current_user: dict = Depends(get_current_admin)):
+    from db import assign_bot_to_user
+    assign_bot_to_user(bot_name, username)
+    return {"msg": f"Bot {bot_name} assigned to {username}"}

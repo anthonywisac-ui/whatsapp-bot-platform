@@ -61,6 +61,15 @@ def login(username: str, password: str):
 def me(current_user: dict = Depends(get_current_user)):
     return {"username": current_user, "user_id": current_user["user_id"], "bots": current_user["bots"]}
 
+@app.get("/create-admin")
+def create_admin():
+    from db import create_user
+    user = create_user("admin", "your_strong_password", role="admin")
+    if user:
+        return {"msg": "Admin user created"}
+    else:
+        return {"msg": "Admin already exists"}
+
 # ========== CMS ROUTES (if exists) ==========
 try:
     from cms.routes import router as cms_router
