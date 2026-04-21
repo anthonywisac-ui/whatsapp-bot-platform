@@ -68,7 +68,13 @@ def login(req: LoginRequest):
 
 @app.get("/auth/me")
 def me(current_user: dict = Depends(get_current_user)):
-    return {"username": current_user, "user_id": current_user["user_id"], "bots": current_user["bots"]}
+    # current_user already contains username, role, user_id
+    return {
+        "username": current_user.get("username"),
+        "role": current_user.get("role", "user"),
+        "user_id": current_user.get("user_id"),
+        "bots": current_user.get("bots", [])
+    }
 
 @app.get("/create-admin")
 def create_admin():
