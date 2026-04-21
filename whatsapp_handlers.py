@@ -2,7 +2,7 @@
 import aiohttp
 import random
 import time
-from config import WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, MANAGER_NUMBER, FREE_DELIVERY_THRESHOLD, DELIVERY_CHARGE
+from config import WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, MANAGER_NUMBER
 from session import SharedSession
 from utils import truncate_title, safe_btn, get_order_total, get_order_text, get_delivery_fee
 
