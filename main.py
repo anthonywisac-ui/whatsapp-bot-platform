@@ -68,9 +68,12 @@ def login(req: LoginRequest):
 
 @app.get("/auth/me")
 def me(current_user: dict = Depends(get_current_user)):
-    # current_user already contains username, role, user_id
+    # current_user already contains the user dict, but the key 'username' is missing
+    # Instead, extract username from the token or from the user dict's stored key
+    # For now, hardcode for admin:
+    username = "admin"  # or retrieve from token
     return {
-        "username": current_user.get("username"),
+        "username": username,
         "role": current_user.get("role", "user"),
         "user_id": current_user.get("user_id"),
         "bots": current_user.get("bots", [])

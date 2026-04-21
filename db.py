@@ -79,16 +79,19 @@ def hash_password(password):
 def verify_password(plain, hashed):
     return pwd_context.verify(plain, hashed)
 
-def create_user(username: str, password: str):
+def create_user(username, password, role="user"):
     global _next_user_id
     if username in _users_db:
         return None
     _users_db[username] = {
         "user_id": _next_user_id,
+        "username": username,   # <-- add this line
         "hashed_password": hash_password(password),
-        "bots": []  # list of bot names owned by this user
+        "bots": [],
+        "role": role
     }
     _next_user_id += 1
+    return _users_db[username]
 
 # Modify create_user
 def create_user(username: str, password: str, role: str = "user"):
