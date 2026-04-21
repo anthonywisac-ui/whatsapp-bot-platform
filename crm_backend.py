@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel
-from database import (
+from db import (
     get_db, get_user_by_username, decode_token, User,
     Contact, Deal, Call, VapiAgent, WhatsappBot,
     get_contacts, create_contact, get_deals, create_deal,
